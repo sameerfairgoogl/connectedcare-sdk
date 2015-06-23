@@ -1,18 +1,29 @@
-﻿using Newtonsoft.Json.Linq;
+﻿//    Copyright 2015 SnapMD, Inc.
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+//        http://www.apache.org/licenses/LICENSE-2.0
+//    Unless required by applicable law or agreed to in writing, software
+//    distributed under the License is distributed on an "AS IS" BASIS,
+//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//    See the License for the specific language governing permissions and
+//    limitations under the License.
+using Newtonsoft.Json.Linq;
 using SnapMD.ConnectedCare.Sdk.Models;
+using SnapMD.ConnectedCare.Sdk.Interfaces;
 
 namespace SnapMD.ConnectedCare.Sdk
 {
     public class PaymentsApi : ApiCall
     {
-        public PaymentsApi(string baseUrl, string bearerToken, int hospitalId, string developerId, string apiKey)
-            : base(baseUrl, bearerToken, developerId, apiKey)
+        public PaymentsApi(string baseUrl, string bearerToken, int hospitalId, string developerId, string apiKey, IWebClient webClient)
+            : base(baseUrl, webClient, bearerToken, developerId, apiKey)
         {
             HospitalId = hospitalId;
         }
 
-        public PaymentsApi(string baseUrl, int hospitalId)
-            : base(baseUrl)
+        public PaymentsApi(string baseUrl, int hospitalId, IWebClient webClient)
+            : base(baseUrl, webClient)
         {
             HospitalId = hospitalId;
         }
@@ -21,13 +32,18 @@ namespace SnapMD.ConnectedCare.Sdk
 
         public JObject GetCustomerProfile(int userId)
         {
-            var result = MakeCall(string.Format("patients/{0}/payments", userId));
+            //API looks so strange 
+
+
+            //hospital/{hospitalId}/payments/{userId}
+            var result = MakeCall(string.Format("hospital/{0}/payments", HospitalId));
             return result;
         }
 
         public JObject RegisterProfile(int userId, object paymentData)
         {
-            var result = Post(string.Format("patients/{0}/payments", userId), paymentData);
+            //hospital/{hospitalId}/payments/{userId}
+            var result = Post(string.Format("patients/payments"), paymentData);
             return result;
         }
 

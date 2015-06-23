@@ -1,11 +1,25 @@
-﻿using System;
+﻿//    Copyright 2015 SnapMD, Inc.
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+//        http://www.apache.org/licenses/LICENSE-2.0
+//    Unless required by applicable law or agreed to in writing, software
+//    distributed under the License is distributed on an "AS IS" BASIS,
+//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//    See the License for the specific language governing permissions and
+//    limitations under the License.
+using System;
 using System.Diagnostics;
 using System.Net;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using SnapMD.ConnectedCare.Sdk.Interfaces;
 
 namespace SnapMD.ConnectedCare.Sdk
 {
+    //replace all calls and references to webclient, with WebClientWrapper, 
+    //and route them through the wrapper.
+
     public class ApiCall
     {
         private readonly string _apiKey;
@@ -13,19 +27,24 @@ namespace SnapMD.ConnectedCare.Sdk
         private readonly string _bearerToken;
         private readonly string _developerId;
 
-        public ApiCall(string baseUrl, string bearerToken = null, string developerId = null, string apiKey = null)
+        public IWebClient WebClientInstance { get; set; }
+
+        public ApiCall(string baseUrl, IWebClient client, string bearerToken = null, string developerId = null, string apiKey = null)
         {
             _baseUrl = baseUrl;
             _bearerToken = bearerToken;
             _developerId = developerId;
             _apiKey = apiKey;
             RequiresAuthentication = true;
+
+            this.WebClientInstance = client;
         }
 
-        public ApiCall(string baseUrl)
+        public ApiCall(string baseUrl, IWebClient client)
         {
             _baseUrl = baseUrl;
             RequiresAuthentication = true;
+            this.WebClientInstance = client;
         }
 
         public bool RequiresAuthentication { get; set; }
@@ -61,25 +80,52 @@ namespace SnapMD.ConnectedCare.Sdk
             }
         }
 
-        protected JObject MakeCall(Func<WebClient, string> executeFunc)
+        public WebResponse Response(System.Net.WebRequest request)
         {
-            using (var wc = new WebClient())
+            try
             {
-                // Allow domains we don't have a certificate for
-                ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
-                SetHeaders(wc);
-                return MakeCall(wc, executeFunc);
+                var response = request.GetResponse();
+
+                //var response = new System.Net.HttpWebResponse();
+
+                System.IO.Stream stream = response.GetResponseStream();
+
+                string val = "this is a response";
+
+                byte[] valByte = System.Text.Encoding.UTF8.GetBytes(val);
+                stream.Write(valByte, 0, valByte.Length);
+
+                return response;
             }
+            catch (Exception ex) { return null; }
         }
 
-        private void SetHeaders(WebClient wc)
+        protected JObject MakeCall(Func<IWebClient, string> executeFunc)
+        {
+            //Make Injectible
+            //using (var wc = new MockWebClient(Response))
+            //{
+            //    // Allow domains we don't have a certificate for
+            //    ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
+            //    SetHeaders(wc);
+            //    return MakeCall(wc, executeFunc);
+            //}
+
+
+            // Allow domains we don't have a certificate for
+            ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
+            SetHeaders(WebClientInstance);
+            return MakeCall(WebClientInstance, executeFunc);
+        }
+
+        private void SetHeaders(IWebClient wc)
         {
             AddHeader(wc, "Authorization", "Bearer " + _bearerToken);
             AddHeader(wc, "X-Developer-Id", _developerId);
             AddHeader(wc, "X-Api-Key", _apiKey);
         }
 
-        private void AddHeader(WebClient wc, string name, string value)
+        private void AddHeader(IWebClient wc, string name, string value)
         {
             if (!string.IsNullOrEmpty(value))
             {
@@ -109,7 +155,7 @@ namespace SnapMD.ConnectedCare.Sdk
             }
         }
 
-        protected JObject MakeCall(WebClient wc, Func<WebClient, string> executeFunc)
+        protected JObject MakeCall(IWebClient wc, Func<IWebClient, string> executeFunc)
         {
             try
             {
@@ -153,12 +199,14 @@ namespace SnapMD.ConnectedCare.Sdk
                 {
                     // Allow domains we don't have a certificate for
                     ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
+                    
                     if (RequiresAuthentication)
                     {
                         wc.Headers[HttpRequestHeader.Authorization] = "Bearer " + _bearerToken;
                     }
 
                     wc.Headers[HttpRequestHeader.ContentType] = "application/json";
+                    
                     return wc.UploadString(url, method, JsonConvert.SerializeObject(data));
                 });
             }
